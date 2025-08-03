@@ -2,7 +2,7 @@ name: Auto Tweet
 
 on:
   schedule:
-    - cron: '0 18,20 * * *'  # Runs twice daily (8AM and 8PM UTC)
+    - cron: '0 19,20 * * *'  # Runs twice daily (8AM and 8PM UTC)
   workflow_dispatch:  # Allows manual triggers
 
 jobs:
