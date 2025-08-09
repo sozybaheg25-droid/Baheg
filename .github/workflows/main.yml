@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -23,14 +23,12 @@ jobs:
           echo "Installed packages:"
           pip list
           
-      - name: Set UTF-8 environment
+      - name: Configure UTF-8 environment
         run: |
-          echo "Setting UTF-8 environment..."
-          export LANG=C.UTF-8
-          export LC_ALL=C.UTF-8
-          export PYTHONIOENCODING=utf-8
-          echo "Environment:"
-          locale
+          echo "PYTHONUTF8=1" >> $GITHUB_ENV
+          echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
+          echo "LANG=C.UTF-8" >> $GITHUB_ENV
+          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
           
       - name: Run Twitter bot
         env:
@@ -40,14 +38,4 @@ jobs:
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           SHEET_URL: ${{ secrets.SHEET_URL }}
         run: |
-          # Force UTF-8 output
-          PYTHONUTF8=1 python tweet_bot.py
-          
-      - name: Upload logs (if needed)
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: debug-logs
-          path: |
-            *.log
-            debug_output.txt
+          python tweet_bot.py
