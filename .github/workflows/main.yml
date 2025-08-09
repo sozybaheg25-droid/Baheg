@@ -37,5 +37,6 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           SHEET_URL: ${{ secrets.SHEET_URL }}
+          DEFAULT_COMMUNITY: ${{ secrets.DEFAULT_COMMUNITY }}  # Optional
         run: |
           python tweet_bot.py
