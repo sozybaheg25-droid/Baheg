@@ -2,7 +2,7 @@ name: Auto Tweet
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Check every 30 minutes
+    - cron: '*/15 * * * *'  # Check every 15 minutes
   workflow_dispatch:
 
 jobs:
@@ -18,8 +18,20 @@ jobs:
           python-version: '3.11'
           
       - name: Install dependencies
-        run: pip install tweepy==4.14.0 requests google-api-python-client google-auth-oauthlib
-        
+        run: |
+          pip install tweepy==4.14.0 requests chardet
+          echo "Installed packages:"
+          pip list
+          
+      - name: Set UTF-8 environment
+        run: |
+          echo "Setting UTF-8 environment..."
+          export LANG=C.UTF-8
+          export LC_ALL=C.UTF-8
+          export PYTHONIOENCODING=utf-8
+          echo "Environment:"
+          locale
+          
       - name: Run Twitter bot
         env:
           API_KEY: ${{ secrets.API_KEY }}
@@ -27,7 +39,15 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           SHEET_URL: ${{ secrets.SHEET_URL }}
-          # Add these if implementing full sheet updating:
-          # GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          # SHEET_ID: ${{ secrets.SHEET_ID }}
-        run: python tweet_bot.py
+        run: |
+          # Force UTF-8 output
+          PYTHONUTF8=1 python tweet_bot.py
+          
+      - name: Upload logs (if needed)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-logs
+          path: |
+            *.log
+            debug_output.txt
