@@ -8,6 +8,7 @@ import time
 import io
 import sys
 import chardet
+import json
 
 print("=== Starting Twitter Bot ===")
 print(f"Execution time: {datetime.utcnow().isoformat()} UTC")
@@ -31,6 +32,11 @@ client = tweepy.Client(
     access_token=ACCESS_TOKEN,
     access_token_secret=ACCESS_TOKEN_SECRET
 )
+
+# Create v1.1 API for community posting
+auth = tweepy.OAuthHandler(API_KEY, API_SECRET)
+auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+api_v1 = tweepy.API(auth)
 
 # Test authentication
 try:
@@ -123,30 +129,41 @@ def fetch_untweeted_rows():
         return [], []
 
 def send_tweet(text, community_id):
-    """Send tweet to specific community"""
+    """Send tweet to specific community using Twitter API v1.1"""
     try:
-        # Validate community ID format (Twitter IDs are numeric)
+        # Validate community ID format
         if community_id and not community_id.isdigit():
             print(f"⚠️ Invalid community ID: '{community_id}' - must be numeric")
             community_id = None
             
         # Create tweet parameters
-        params = {"text": text}
+        params = {"status": text}
         if community_id:
             params["community_id"] = community_id
             print(f"📢 Posting to community: {community_id}")
         else:
             print("🌐 Posting to public timeline")
             
-        # Send tweet
-        response = client.create_tweet(**params)
-        tweet_id = response.data['id']
+        # Send tweet using v1.1 API
+        status = api_v1.update_status(**params)
+        tweet_id = status.id
         print(f"🐦 Successfully tweeted! ID: {tweet_id}")
         print(f"🔗 Link: https://twitter.com/{username}/status/{tweet_id}")
         return tweet_id
         
     except tweepy.TweepyException as e:
-        print(f"❌ Twitter error: {e}", file=sys.stderr)
+        # Extract error details
+        errors = e.api_messages if hasattr(e, 'api_messages') else [str(e)]
+        print(f"❌ Twitter error: {', '.join(errors)}", file=sys.stderr)
+        
+        # Log full error details for debugging
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_details = e.response.json()
+                print(f"🔍 Error details: {json.dumps(error_details, indent=2)}")
+            except:
+                print(f"🔍 Raw error response: {e.response.text[:500]}")
+                
         return None
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}", file=sys.stderr)
@@ -166,11 +183,7 @@ def tweet_new_messages():
     print(f"🏠 Community: {message['community'] or 'None'}")
     
     tweet_id = send_tweet(message['text'], message['community'])
-    
-    if tweet_id:
-        print(f"📝 Would update row {message['index']} with tweet ID")
-        return True
-    return False
+    return tweet_id is not None
 
 # Run the main function
 if __name__ == "__main__":
