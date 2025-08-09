@@ -5,7 +5,9 @@ import requests
 import random
 from datetime import datetime
 import time
+import io
 import sys
+import chardet
 
 print("=== Starting Twitter Bot ===")
 print(f"Execution time: {datetime.utcnow().isoformat()} UTC")
@@ -36,8 +38,16 @@ except Exception as e:
     print(f"❌ Authentication failed: {str(e)}")
     raise
 
+def detect_encoding(content):
+    """Detect encoding of byte content"""
+    result = chardet.detect(content)
+    encoding = result['encoding'] or 'utf-8'
+    confidence = result['confidence']
+    print(f"🔠 Detected encoding: {encoding} (confidence: {confidence:.2f})")
+    return encoding
+
 def fetch_untweeted_rows():
-    """Fetch rows from Google Sheet that haven't been tweeted"""
+    """Fetch rows from Google Sheet with proper Arabic encoding"""
     try:
         print(f"\n📥 Fetching Google Sheet from: {SHEET_URL}")
         start_time = time.time()
@@ -46,16 +56,26 @@ def fetch_untweeted_rows():
         
         print(f"🔁 Response status: {response.status_code}")
         print(f"⏱️ Response time: {response_time:.2f}s")
-        print(f"📄 Response size: {len(response.text)} characters")
+        print(f"📄 Response size: {len(response.content)} bytes")
         
         response.raise_for_status()
         
-        # Print first 200 characters of response
-        sample = response.text[:200].replace('\n', '\\n')
-        print(f"📝 Sample response: '{sample}'...")
+        # Detect and decode with proper encoding
+        encoding = detect_encoding(response.content)
+        try:
+            decoded_content = response.content.decode(encoding)
+        except UnicodeDecodeError:
+            # Fallback to UTF-8
+            print("⚠️ Decoding failed, trying UTF-8 fallback")
+            decoded_content = response.content.decode('utf-8', errors='replace')
         
-        # Parse CSV data
-        reader = csv.reader(response.text.splitlines())
+        # Print sample text
+        sample = decoded_content[:200].replace('\n', '\\n')
+        print(f"📝 Sample content: '{sample}'...")
+        
+        # Parse CSV with proper encoding
+        csv_file = io.StringIO(decoded_content)
+        reader = csv.reader(csv_file)
         rows = list(reader)
         
         print(f"\n📊 Found {len(rows)} total rows in CSV")
@@ -74,33 +94,28 @@ def fetch_untweeted_rows():
             if not row or len(row) == 0:
                 continue
                 
-            # Print row structure
-            print(f"\n🔍 Row {i} analysis:")
-            print(f"  Raw row: {row}")
-            print(f"  Columns: {len(row)}")
+            # Print row structure (first 3 columns)
+            row_display = [f"'{col[:20]}...'" if len(col) > 20 else f"'{col}'" 
+                          for col in row[:3]]
+            print(f"\n🔍 Row {i}: {row_display}")
             
             # Check if at least first column exists
             if len(row) > 0 and row[0].strip():
-                print(f"  Column 1: '{row[0]}'")
-                
                 # Check status column (if exists)
                 status = ""
                 if len(row) > 1:
                     status = row[1].strip()
-                    print(f"  Column 2 (status): '{status}'")
-                else:
-                    print("  Column 2: Not present")
                     
-                # Check if untweeted
-                if not status:
+                # Print status
+                if status:
+                    print(f"⏭️ Status: '{status}' - already tweeted")
+                else:
                     print("✅ Row is untweeted!")
                     untweeted.append({
                         "index": i,
                         "text": row[0].strip()[:280],
                         "row": row
                     })
-                else:
-                    print("⏭️ Row already tweeted")
             else:
                 print("❌ Row skipped - empty first column")
                 
@@ -112,7 +127,7 @@ def fetch_untweeted_rows():
         return [], []
 
 def tweet_new_messages():
-    """Tweet new messages from sheet and mark them as tweeted"""
+    """Tweet new messages from sheet"""
     untweeted, all_rows = fetch_untweeted_rows()
     
     if not untweeted:
