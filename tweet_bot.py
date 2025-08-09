@@ -1,25 +1,40 @@
-import tweepy
 import os
+import tweepy
 import random
+from datetime import datetime
 
-# Get credentials from environment variables
-api_key = os.getenv("API_KEY")
-api_secret = os.getenv("API_SECRET")
-access_token = os.getenv("ACCESS_TOKEN")
-access_token_secret = os.getenv("ACCESS_TOKEN_SECRET")
+# Twitter credentials
+API_KEY = os.environ['API_KEY']
+API_SECRET = os.environ['API_SECRET']
+ACCESS_TOKEN = os.environ['ACCESS_TOKEN']
+ACCESS_TOKEN_SECRET = os.environ['ACCESS_TOKEN_SECRET']
 
-# Auth & API setup
-auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_token_secret)
-api = tweepy.API(auth)
+# Create v2 client
+client = tweepy.Client(
+    consumer_key=API_KEY,
+    consumer_secret=API_SECRET,
+    access_token=ACCESS_TOKEN,
+    access_token_secret=ACCESS_TOKEN_SECRET
+)
 
-# Tweet messages list
+# Tweet messages
 messages = [
-    "What is this?",
-    "How is this?",
-    "Yes it is!",
-    "Hello Twitter!",
-    "Automated tweet 👋",
+    "Hello Twitter! 🤖 Automated tweet from GitHub Actions",
+    "Testing my auto-tweet system 🚀",
+    "This tweet was scheduled using GitHub Actions ⚙️",
+    "GitHub Actions + Twitter API = 💙",
+    "Success! My auto-tweet works! 🎉"
 ]
 
-# Send tweet
-api.update_status(random.choice(messages))
+# Select random message
+message = random.choice(messages)
+
+try:
+    # Post tweet using v2 API
+    response = client.create_tweet(text=message)
+    print(f"Successfully tweeted: {message}")
+    print(f"Tweet ID: {response.data['id']}")
+except tweepy.TweepyException as e:
+    print(f"Twitter error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {str(e)}")
