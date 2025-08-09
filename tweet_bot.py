@@ -8,7 +8,6 @@ import time
 import io
 import sys
 import chardet
-import json
 
 print("=== Starting Twitter Bot ===")
 print(f"Execution time: {datetime.utcnow().isoformat()} UTC")
@@ -19,11 +18,8 @@ API_SECRET = os.environ['API_SECRET']
 ACCESS_TOKEN = os.environ['ACCESS_TOKEN']
 ACCESS_TOKEN_SECRET = os.environ['ACCESS_TOKEN_SECRET']
 SHEET_URL = os.environ['SHEET_URL']
-DEFAULT_COMMUNITY = os.environ.get('DEFAULT_COMMUNITY', '')  # Optional default community
 
 print(f"Environment variables loaded: SHEET_URL={SHEET_URL[:30]}...")
-if DEFAULT_COMMUNITY:
-    print(f"Using default community: {DEFAULT_COMMUNITY}")
 
 # Create Twitter client
 client = tweepy.Client(
@@ -32,11 +28,6 @@ client = tweepy.Client(
     access_token=ACCESS_TOKEN,
     access_token_secret=ACCESS_TOKEN_SECRET
 )
-
-# Create v1.1 API for community posting
-auth = tweepy.OAuthHandler(API_KEY, API_SECRET)
-auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-api_v1 = tweepy.API(auth)
 
 # Test authentication
 try:
@@ -56,7 +47,7 @@ def detect_encoding(content):
     return encoding
 
 def fetch_untweeted_rows():
-    """Fetch rows from Google Sheet with proper encoding"""
+    """Fetch rows from Google Sheet with proper Arabic encoding"""
     try:
         print(f"\n📥 Fetching Google Sheet from: {SHEET_URL}")
         start_time = time.time()
@@ -100,26 +91,33 @@ def fetch_untweeted_rows():
                 continue
                 
             # Skip empty rows
-            if not row or len(row) == 0 or not row[0].strip():
+            if not row or len(row) == 0:
                 continue
                 
-            # Extract data from columns
-            tweet_text = row[0].strip()[:280]
-            status = row[1].strip() if len(row) > 1 else ""
-            community_id = row[2].strip() if len(row) > 2 else DEFAULT_COMMUNITY
+            # Print row structure (first 3 columns)
+            row_display = [f"'{col[:20]}...'" if len(col) > 20 else f"'{col}'" 
+                          for col in row[:3]]
+            print(f"\n🔍 Row {i}: {row_display}")
             
-            # Check if already tweeted
-            if status:
-                print(f"⏭️ Row {i} skipped - already tweeted")
-                continue
-                
-            print(f"✅ Row {i} is untweeted")
-            untweeted.append({
-                "index": i,
-                "text": tweet_text,
-                "community": community_id,
-                "row": row
-            })
+            # Check if at least first column exists
+            if len(row) > 0 and row[0].strip():
+                # Check status column (if exists)
+                status = ""
+                if len(row) > 1:
+                    status = row[1].strip()
+                    
+                # Print status
+                if status:
+                    print(f"⏭️ Status: '{status}' - already tweeted")
+                else:
+                    print("✅ Row is untweeted!")
+                    untweeted.append({
+                        "index": i,
+                        "text": row[0].strip()[:280],
+                        "row": row
+                    })
+            else:
+                print("❌ Row skipped - empty first column")
                 
         print(f"\n📊 Found {len(untweeted)} untweeted rows")
         return untweeted, rows
@@ -127,47 +125,6 @@ def fetch_untweeted_rows():
     except Exception as e:
         print(f"❌ Sheet fetch error: {str(e)}", file=sys.stderr)
         return [], []
-
-def send_tweet(text, community_id):
-    """Send tweet to specific community using Twitter API v1.1"""
-    try:
-        # Validate community ID format
-        if community_id and not community_id.isdigit():
-            print(f"⚠️ Invalid community ID: '{community_id}' - must be numeric")
-            community_id = None
-            
-        # Create tweet parameters
-        params = {"status": text}
-        if community_id:
-            params["community_id"] = community_id
-            print(f"📢 Posting to community: {community_id}")
-        else:
-            print("🌐 Posting to public timeline")
-            
-        # Send tweet using v1.1 API
-        status = api_v1.update_status(**params)
-        tweet_id = status.id
-        print(f"🐦 Successfully tweeted! ID: {tweet_id}")
-        print(f"🔗 Link: https://twitter.com/{username}/status/{tweet_id}")
-        return tweet_id
-        
-    except tweepy.TweepyException as e:
-        # Extract error details
-        errors = e.api_messages if hasattr(e, 'api_messages') else [str(e)]
-        print(f"❌ Twitter error: {', '.join(errors)}", file=sys.stderr)
-        
-        # Log full error details for debugging
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                error_details = e.response.json()
-                print(f"🔍 Error details: {json.dumps(error_details, indent=2)}")
-            except:
-                print(f"🔍 Raw error response: {e.response.text[:500]}")
-                
-        return None
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}", file=sys.stderr)
-        return None
 
 def tweet_new_messages():
     """Tweet new messages from sheet"""
@@ -179,11 +136,24 @@ def tweet_new_messages():
         
     # Select one random untweeted message
     message = random.choice(untweeted)
-    print(f"\n✏️ Selected tweet: '{message['text']}'")
-    print(f"🏠 Community: {message['community'] or 'None'}")
+    print(f"\n✏️ Selected tweet: '{message['text']}' ({len(message['text'])} chars)")
     
-    tweet_id = send_tweet(message['text'], message['community'])
-    return tweet_id is not None
+    try:
+        # Send tweet
+        response = client.create_tweet(text=message['text'])
+        tweet_id = response.data['id']
+        print(f"🐦 Successfully tweeted! ID: {tweet_id}")
+        print(f"🔗 Link: https://twitter.com/{username}/status/{tweet_id}")
+        
+        print(f"📝 Would update row {message['index']} with tweet ID")
+        return True
+        
+    except tweepy.TweepyException as e:
+        print(f"❌ Twitter error: {e}", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}", file=sys.stderr)
+        return False
 
 # Run the main function
 if __name__ == "__main__":
