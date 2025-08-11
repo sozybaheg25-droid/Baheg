@@ -2,7 +2,7 @@ name: Auto Tweet
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Check every 15 minutes
+    - cron: '0 8,14,20 * * *'  # 8AM, 2PM, 8PM UTC (3 times daily)
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,8 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install tweepy==4.14.0 requests chardet
+          python -m pip install --upgrade pip
+          pip install tweepy==4.14.0 requests chardet gspread oauth2client
           echo "Installed packages:"
           pip list
           
@@ -32,11 +33,15 @@ jobs:
           
       - name: Run Twitter bot
         env:
+          # Twitter credentials
           API_KEY: ${{ secrets.API_KEY }}
           API_SECRET: ${{ secrets.API_SECRET }}
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
+          
+          # Google Sheets
           SHEET_URL: ${{ secrets.SHEET_URL }}
-          DEFAULT_COMMUNITY: ${{ secrets.DEFAULT_COMMUNITY }}  # Optional
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: |
           python tweet_bot.py
