@@ -3,14 +3,12 @@ import tweepy
 import csv
 import requests
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
 import io
 import sys
 import chardet
 import json
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
 print("=== Starting Twitter Bot ===")
 print(f"Execution time: {datetime.utcnow().isoformat()} UTC")
@@ -21,8 +19,6 @@ API_SECRET = os.environ['API_SECRET']
 ACCESS_TOKEN = os.environ['ACCESS_TOKEN']
 ACCESS_TOKEN_SECRET = os.environ['ACCESS_TOKEN_SECRET']
 SHEET_URL = os.environ['SHEET_URL']
-GOOGLE_CREDENTIALS = json.loads(os.environ['GOOGLE_CREDENTIALS'])
-SHEET_ID = os.environ['SHEET_ID']
 
 print("✅ Environment variables loaded")
 
@@ -33,10 +29,6 @@ client = tweepy.Client(
     access_token=ACCESS_TOKEN,
     access_token_secret=ACCESS_TOKEN_SECRET
 )
-
-# Create Google Sheets service
-creds = service_account.Credentials.from_service_account_info(GOOGLE_CREDENTIALS)
-sheets_service = build('sheets', 'v4', credentials=creds)
 
 def detect_encoding(content):
     """Detect encoding of byte content"""
@@ -92,34 +84,6 @@ def fetch_untweeted_rows():
         print(f"❌ Sheet fetch error: {str(e)}", file=sys.stderr)
         return []
 
-def mark_as_tweeted(row_index, tweet_id):
-    """Update Google Sheet to mark tweet as sent"""
-    try:
-        # Get current UTC time
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        
-        # Prepare update values: [Tweeted?, Tweet ID, Timestamp]
-        values = [["✅", tweet_id, timestamp]]
-        
-        # Update range (columns B-D)
-        range_name = f"Sheet1!B{row_index}:D{row_index}"
-        
-        body = {"values": values}
-        
-        result = sheets_service.spreadsheets().values().update(
-            spreadsheetId=SHEET_ID,
-            range=range_name,
-            valueInputOption="USER_ENTERED",
-            body=body
-        ).execute()
-        
-        print(f"📊 Updated row {row_index} in Google Sheet")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Sheet update failed: {str(e)}", file=sys.stderr)
-        return False
-
 def send_tweet(message):
     """Send a tweet and return tweet ID"""
     try:
@@ -153,13 +117,11 @@ def tweet_new_messages():
         if not tweet_id:
             continue
             
-        # Mark as tweeted in sheet
-        if mark_as_tweeted(message['sheet_row'], tweet_id):
-            successful_tweets += 1
-            print(f"🐦 Successfully tweeted! ID: {tweet_id}")
-            
-            # Add delay between tweets (avoid rate limits)
-            time.sleep(5)
+        successful_tweets += 1
+        print(f"🐦 Successfully tweeted! ID: {tweet_id}")
+        
+        # Add delay between tweets (avoid rate limits)
+        time.sleep(5)
     
     print(f"\n🏁 Sent {successful_tweets} tweets")
     return successful_tweets > 0
