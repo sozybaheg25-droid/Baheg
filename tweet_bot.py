@@ -104,8 +104,8 @@ def tweet_new_messages():
     # Track successful tweets
     successful_tweets = 0
     
-    # Try to send up to 3 tweets (if available)
-    for _ in range(min(3, len(untweeted))):
+    # Try to send up to 1 tweets (if available)
+    for _ in range(min(1, len(untweeted))):
         # Select random untweeted message
         message = random.choice(untweeted)
         untweeted.remove(message)  # Remove from selection pool
@@ -132,3 +132,4 @@ if __name__ == "__main__":
     success = tweet_new_messages()
     print(f"\n🏁 Execution {'succeeded' if success else 'failed'}")
     exit(0 if success else 1)
+
