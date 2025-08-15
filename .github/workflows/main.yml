@@ -2,7 +2,7 @@ name: Auto Tweet
 
 on:
   schedule:
-    - cron: '0 22 */2 * *'  # Every two days at 10 PM UTC
+    - cron: '0 17-21 */2 * *'  # Every two days between 5-9 PM UTC
   workflow_dispatch:
 
 jobs:
@@ -19,29 +19,25 @@ jobs:
           
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install tweepy==4.14.0 requests chardet gspread oauth2client
-          echo "Installed packages:"
-          pip list
-          
-      - name: Configure UTF-8 environment
+          pip install tweepy==4.14.0 requests chardet
+        
+      - name: Configure environment
         run: |
           echo "PYTHONUTF8=1" >> $GITHUB_ENV
-          echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
           echo "LANG=C.UTF-8" >> $GITHUB_ENV
-          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
+          echo "RANDOM_DELAY=$(( $RANDOM % 240 ))" >> $GITHUB_ENV  # 0-240 minute random delay
+          
+      - name: Wait random time
+        run: |
+          echo "Waiting for $RANDOM_DELAY minutes"
+          sleep $(($RANDOM_DELAY * 60))
           
       - name: Run Twitter bot
         env:
-          # Twitter credentials
           API_KEY: ${{ secrets.API_KEY }}
           API_SECRET: ${{ secrets.API_SECRET }}
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
-          
-          # Google Sheets
           SHEET_URL: ${{ secrets.SHEET_URL }}
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: |
           python tweet_bot.py
